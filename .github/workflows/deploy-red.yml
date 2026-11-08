@@ -1,0 +1,33 @@
+name: Deploy red
+
+on:
+  push:
+    branches: [main]
+    paths: ["services/red/**", ".github/workflows/deploy-red.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    # Skips cleanly until GCP is configured for this repository.
+    if: ${{ vars.GCP_PROJECT_ID != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Vendor the redloop package and seeds into the build context
+        run: cp -r services/red/redloop services/red/deploy/service/ && cp services/red/seeds/seeds.json services/red/deploy/service/
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy evolveops-red --source services/red/deploy/service \
+            --project "${{ vars.GCP_PROJECT_ID }}" --region "${{ vars.GCP_REGION || 'asia-east1' }}" \
+            --allow-unauthenticated --timeout=3600 \
+            --set-env-vars TARGET_URL=${{ vars.WARDEN_URL }},TARGET_USER_ID=alice,VERTEX_PROJECT=${{ vars.GCP_PROJECT_ID }} \
+            --set-secrets TRIGGER_KEY=evolveops-red-trigger-key:latest,TARGET_PASSWORD=evolveops-blue-user-password:latest

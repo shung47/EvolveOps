@@ -1,0 +1,32 @@
+name: Deploy blue
+
+on:
+  push:
+    branches: [main]
+    paths: ["services/blue/**", ".github/workflows/deploy-blue.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    # Skips cleanly until GCP is configured for this repository.
+    if: ${{ vars.GCP_PROJECT_ID != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy evolveops-blue --source services/blue \
+            --project "${{ vars.GCP_PROJECT_ID }}" --region "${{ vars.GCP_REGION || 'asia-east1' }}" \
+            --allow-unauthenticated \
+            --set-env-vars GCP_PROJECT=${{ vars.GCP_PROJECT_ID }} \
+            --set-secrets PROPOSAL_TOKEN=evolveops-blue-proposal-token:latest,APPROVAL_TOKEN=evolveops-blue-approval-token:latest,SEED_USER_PASSWORD=evolveops-blue-user-password:latest,SEED_ADMIN_PASSWORD=evolveops-blue-admin-password:latest

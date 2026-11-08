@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+runs/
+# copied in by services/red/deploy.sh at build time
+services/red/deploy/*/vendor/
+services/red/deploy/job/seeds/
+services/red/deploy/service/redloop/
+services/red/deploy/service/seeds.json

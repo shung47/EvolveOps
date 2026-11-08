@@ -1,0 +1,32 @@
+name: Deploy green
+
+on:
+  push:
+    branches: [main]
+    paths: ["services/green/**", ".github/workflows/deploy-green.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    # Skips cleanly until GCP is configured for this repository.
+    if: ${{ vars.GCP_PROJECT_ID != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy evolveops-green --source services/green \
+            --project "${{ vars.GCP_PROJECT_ID }}" --region "${{ vars.GCP_REGION || 'asia-east1' }}" \
+            --allow-unauthenticated \
+            --set-env-vars GOOGLE_CLOUD_PROJECT=${{ vars.GCP_PROJECT_ID }},GOOGLE_GENAI_USE_VERTEXAI=TRUE,REGION=${{ vars.GCP_REGION || 'asia-east1' }},GITHUB_REPO=${{ vars.GREEN_TARGET_REPO }} \
+            --set-secrets GREEN_TEAM_TOKEN=evolveops-green-token:latest,GITHUB_TOKEN=github-token:latest
